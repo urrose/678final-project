@@ -1,0 +1,334 @@
+---
+title: "678_final"
+author: "Yingnan Lyu"
+date: "2022-12-05"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+library(ggplot2)
+library(hrbrthemes)
+library(PerformanceAnalytics)
+library(lmerTest)
+library(merTools)
+library(lattice)
+library(gridExtra)
+```
+
+##Abstract
+
+
+Bicycle sharing is a very popular industry in the last few years. Bicycle sharing not only brings a lot of convenience to the daily life of urban residents but also the creation of many bicycle-sharing companies has injected a lot of vitality into the market. In order to run the company better and get the maximum profit, many companies want to forecast the rental volume based on some specific data from the past, which will help them to plan more rationally. Thus, here comes the problem: what kind of data do bike-sharing companies need to collect to help them forecast future rentals? To figure out this problem, I built a multilevel model with group level ‘month’and ‘weekday’. The result indicates that in different months and weekdays there are different pattern for people to rent bikes. This report can be divided into 4 main parts: Introduction, Method, Result, and Discussion.
+
+
+
+
+## Introduction
+
+
+In order to see the pattern of renting, I choose the data from a bike-renting company to analyze. The service provider collects the entire US market based on a few factors. It contains various details of weather conditions, temperatures, windspeed, year, month, day, and whether it was a holiday or not when the bike was rented by the customers. Thus, I want to apply a multilevel model to this data to determine drivers that can make bike renting numbers go up. They want to understand the factors affecting the demand for these shared bikes in the American market. Specifically, the company wants to know:what variables are important in forecasting the demand for shared bikes, and how well do these variables explain the demand for bicycles based on various weather surveys and styles of people.
+
+I will model the demand for bike sharing with the available independent variables. Managers will use it to understand how the needs of different functions are changing. They can manipulate business strategies accordingly to meet demand levels and customer expectations. In addition, the model will be a great way for management to understand the demand dynamics of new markets.
+
+\newpage
+
+## Methods
+
+### Data Preprocessing
+
+
+I found this data from the kaggle website(https://www.kaggle.com/datasets/shrutipandit707/bikesharing).
+
+I download the data from the website and add two columns(casual and registered) together to get a new column to create the appropriate data frame named df2. The new column delegates the total number of the renting bikes in a day. In this case, this data frame is suitable for me to apply a multilevel model to see which factor can influence the renting in different group level.
+
+Here is the glossary of terms:
+
+| column names      | explanation                                        |
+| :--:              | :--------                                          |
+| instant           | Instant when Bike was rented                       |
+| dteday            | Date when Bike was rented                          |
+| season            | Season when Bike was rented                        |
+| yr                | Year when Bike was rented                          |
+| mnth              | Month when Bike was rented                         |
+| holiday           | If Bike was rented on a Holiday or a Working Day   |
+| weekday           | WeekDay when Bike was rented                       |
+| workingday        | If Bike was rented on a Holiday or a Working Day   |
+| weathersit        | In Which Weather season Bike was Rented            |
+| temp              | Temperature description when Bike was rented       |
+| atemp             | Atemp when Bike was rented                         |
+| hum               | Humidity when Bike was rented                      |
+| windspeed         | Windspeed when Bike was rented                     |
+| casual            | If user who rented the bike is non-registered user |
+| registered        | If user who rented the bike is a registered user   |
+| cnt               | Count of times when Bike was rented                |
+| total_number      | total number of the renting that day               |
+
+
+\newpage
+
+### Exploratory Data Analysis
+
+
+```{r include=FALSE}
+df <- read.csv("/Users/roselv/Desktop/day.csv")
+head(df)
+total_number <- df$casual + df$registered
+df2 <- cbind(df, total_number)
+head(df2)
+
+```
+
+
+
+I've got a dataframe with 730 observations and 17 variables. I choose 'total_number' as the output and pick 5 factors as predictors. Then, I did following analysis in order to determine which predictor to fit the multilevel model. 
+
+
+
+
+```{r echo=FALSE, fig.height=4, fig.width=12,fig.cap="total_number vs temperature"}
+#month group
+#Exploratory Data Analysis
+# set.seed(100)
+# sample_month <- sample(unique(df2$mnth), 10, replace = FALSE)
+count_temp <- ggplot(data = df2) + 
+  aes(x = temp , y = total_number) + 
+  geom_point(aes(color = factor(mnth)), size = .6) + 
+  geom_smooth(aes(color = factor(mnth)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Temp", x = "Temperature", y = "Total Number of Bikes")
+
+
+count_temp3 <- ggplot(data = df2) + 
+  aes(x = temp , y = total_number) + 
+  geom_point(aes(color = factor(weekday)), size = .6) + 
+  geom_smooth(aes(color = factor(weekday)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(b) Total Number of Bikes vs Temp", x = "Temperature", y = "Total Number of Bikes")
+
+
+grid.arrange(count_temp,count_temp3 , ncol = 2)
+
+```
+
+
+
+The figure above shows the relationship between the total number of renting bikes and temperature in different group level. At the month level, some groups have the increasing trend but others have the decreasing trend. At the weekday level, the number of renting bikes will increase when the temperature goes up. In this case, we choose temperature as the random effect at the month level. In a similar way, the predictor atmep has the similar trends in this two levels. Thus, temperature and atemp can be the predictor at the month level but not at the weekday level.
+
+
+
+
+```{r echo=FALSE, fig.height=4, fig.width=12,fig.cap="total_number vs humidity"}
+
+
+count_humidity <- ggplot(data = df2) + 
+  aes(x = hum , y = total_number) + 
+  geom_point(aes(color = factor(mnth)), size = .6) + 
+  geom_smooth(aes(color = factor(mnth)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Humidity", x = "Humidity", y = "Total Number of Bikes")
+
+
+
+count_humidity3 <- ggplot(data = df2) + 
+  aes(x = hum , y = total_number) + 
+  geom_point(aes(color = factor(weekday)), size = .6) + 
+  geom_smooth(aes(color = factor(weekday)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Humidity", x = "Humidity", y = "Total Number of Bikes")
+
+
+grid.arrange(count_humidity, count_humidity3, ncol=2)
+```
+
+
+This figure is about the correlation between the total number of bikes and huminity. There are two different kinds of trends at both the month level and weekday level. Thus, huminity can be included as the predictor at these two level.
+
+
+\newpage
+
+```{r echo=FALSE, fig.height=4, fig.width=12,fig.cap="total_number vs windspeed"}
+count_windspeed <- ggplot(data = df2) + 
+  aes(x = windspeed, y = total_number) + 
+  geom_point(aes(color = factor(mnth)), size = .6) + 
+  geom_smooth(aes(color = factor(mnth)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Windspeed", x = "Windspeed", y = "Total Number of Bikes")
+
+
+count_windspeed3 <- ggplot(data = df2) + 
+  aes(x = windspeed, y = total_number) + 
+  geom_point(aes(color = factor(weekday)), size = .6) + 
+  geom_smooth(aes(color = factor(weekday)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Windspeed", x = "Windspeed", y = "Total Number of Bikes")
+
+grid.arrange(count_windspeed, count_windspeed3, ncol=2)
+
+```
+
+These two figures are about the relationsips between the total number of renting bikes and the windspeed at month level and weekday level. We can see from the figure(a), the trends differs from month to month, while the trends in different weekdays are similar. Therefore, windspeed can be a random effect at the month level to fit model.
+
+
+
+
+
+
+```{r echo=FALSE, fig.height=4, fig.width=12,fig.cap="total_number vs weathersit"}
+count_weathersit <- ggplot(data = df2) + 
+  aes(x = weathersit, y = total_number) + 
+  geom_point(aes(color = factor(mnth)), size = .6) + 
+  geom_smooth(aes(color = factor(mnth)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Weathersit", x = "Weathersit", y = "Total Number of Bikes")
+
+
+count_weathersit3 <- ggplot(data = df2) + 
+  aes(x = weathersit, y = total_number) + 
+  geom_point(aes(color = factor(weekday)), size = .6) + 
+  geom_smooth(aes(color = factor(weekday)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Weathersit", x = "Weathersit", y = "Total Number of Bikes")
+
+grid.arrange(count_weathersit, count_weathersit3, ncol=2)
+```
+
+In figure(a), the mainly trend is decreasing but they are in varying degrees. In the figure(b), the trends are similar. In this case, I decided to use weathersit as a random effect at month level.
+
+Now we have four predictors and roughly know their fixed effect. We're a few steps away from modeling. 
+
+
+\newpage
+
+### Correlation of Data
+
+
+
+Since different months and weekdays have a large impact on the model, I decided to use multilevel model to fit df2. In order to do the predictor selection, I did the Pearson correlation matrix.
+
+
+
+
+```{r echo=FALSE, fig.height=5, fig.width=7, warning=FALSE, fig.cap="Correlation Matrix"}
+df3 = subset(df, select = -c(total_number, mnth))
+chart.Correlation(df3[,8:14])
+# df4 = subset(df, select = -c(total_number, holiday))
+# chart.Correlation(df4[,8:14])
+# df5 =subset(df, select = -c(total_number,weekday))
+# chart.Correlation(df5[,8:14])
+```
+
+
+
+This figure clearly shows the Pearson relationship between the variables. I choose .6 as the threshold to represent the variables which are highly related. Because the temperature and windspeed are the most important factors that can influent the renting number, I decided to keep them. From this matrix, .99 means temperature and atemp are highly related, which make me decide to drop one of them to fit the model. Therefore, we have weathersit, temperature, huminity and windspeed as ramdom effect  to fit the model at month and weekday level.
+
+
+
+\newpage
+
+### Model fitting
+
+Here is the function:
+
+```{r include=FALSE}
+multilevel_model <- lmer(total_number ~ temp + hum  + windspeed 
+              + weathersit 
+              + (  temp + hum + windspeed | mnth) 
+              + (  hum + windspeed | weekday),
+              data = df2)
+summary(multilevel_model)
+```
+
+Fixed effects:
+
+|                |Estimate   |Std. Error  |df        |t value |Pr(>&#124;t&#124;) |
+|:---:           |:---:      |:---:       |:---:     |:---:   |:---:              |
+|(Intercept)    |5877.552    | 885.032    |17.282    |6.641   |3.83e-06 ***       |  
+|temp           |153.397     | 36.264     |13.526    |4.230   |0.000903 ***       | 
+|hum            |-40.806     |10.031      |14.094    |-4.068  |0.001137 **        |
+|windspeed      |-65.100     |12.723      | 9.187    |-5.117  |0.000591 ***       |
+|weathersit     |-265.059    |107.490     |675.340   |-2.466  |0.013915 *         |
+
+
+
+
+The chart above is the summary of the fixed effect and all the variables are considered as significant at .6 level. We can see it more clearly in the next figure.
+
+
+Besides, the following tables are summary of the ramdom effects. The first table is about random effect at the month level, and the second table is at the weekday level.
+
+
+```{r include=TRUE, echo=FALSE}
+round(ranef(multilevel_model)$mnth, digits = 2)[1:12, ]
+```
+
+
+
+```{r include=TRUE, echo=FALSE}
+round(ranef(multilevel_model)$weekday, digits = 2)
+```
+
+
+### Model checking
+
+```{r echo=FALSE, fig.height=4, fig.width=8, fig.cap="Residual plot and Q-Q plot."}
+residul_plot <- plot(multilevel_model)
+qq_plot      <- qqmath(multilevel_model)
+#grid.arrange(residul_plot, qq_plot, ncol = 2)
+residul_plot
+qq_plot
+```
+
+
+
+According to the residual plot and residual Q-Q plot, the mean value of the residuals is approximately equals to zero. In the Q-Q plot, most of the points exept the tail ones are on the normal distribution line. Thus, the normality check is acceptable.
+
+
+\newpage
+
+## Result
+
+### Interpretation
+
+This is the fomular of fixed effect:
+
+$$ log(total_number) = 5877.6  +  153.4\times temp - 40.8 \times hum - 65.1 \times windspeed - 265.1\times weathersit $$
+
+Then add random effect of to the intercepts and slopes to get the model. Let's take July as an example.
+
+
+$$ log(total_number) = 9011.2  - 66.5 \times temp - 9.4 \times hum - 50.6 \times windspeed - 265.1\times weathersit $$
+
+All parameters in this model are negatively correlated with the dependent variable. This means that high temperatures, increased rainfall, and high wind speed will reduce the number of bike share rentals. In this model, the 730 observations are divided into two groups, one based on month and the other based on weekday. Four variables were selected from 17 variables to fit the model, namely temperature, humidity, wind speed, and weather type, and the EDA images were used to determine which variables were random effects.
+
+According to this model, each degree increase in temperature decreases the number of rentals by 66.5, each unit increase in humidity decreases the number of rentals by 9.4, and each unit increase in wind speed increases the number of rentals by 50.4, with a difference of 265 between the different weather types.
+
+
+
+
+
+## Discussion
+
+
+Through the construction of the model, we can clearly see the influence of various external factors on car rental volume. However, in this report, we mainly study the effect of weather on car rental volume, but it is known that not only weather affects car rental volume. Therefore, if bike-sharing companies want to better predict the number of rentals and develop business plans, they need to collect more data and analyze whether other types of factors have a significant impact on the number of rentals, such as epidemics, holidays, major events in the city, etc. The more variables and data available, the more profitable it will be to forecast car rentals, the more markets it will open up, and the more convenient it will be for citizens.
+
+\newpage
+
+## Appendix
+
+```{r echo=FALSE, fig.height=4, fig.width=12,fig.cap="total_number vs atemp"}
+count_atemp <- ggplot(data = df2) + 
+  aes(x = atemp, y = total_number) + 
+  geom_point(aes(color = factor(mnth)), size = .6) + 
+  geom_smooth(aes(color = factor(mnth)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Atemp", x = "Atemp", y = "Total Number of Bikes")
+
+count_atemp3 <- ggplot(data = df2) + 
+  aes(x = atemp, y = total_number) + 
+  geom_point(aes(color = factor(weekday)), size = .6) + 
+  geom_smooth(aes(color = factor(weekday)), method = "lm", se = FALSE, formula = 'y ~ x') + 
+  labs(title = "(a) Total Number of Bikes vs Atemp", x = "Atemp", y = "Total Number of Bikes")
+grid.arrange(count_atemp, count_atemp3, ncol=2)
+```
+
+```{r}
+plotFEsim(FEsim(multilevel_model, n.sims = 300), level = 0.95, stat = 'median', intercept = FALSE)
+```
