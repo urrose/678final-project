@@ -22,7 +22,7 @@ library(lattice)
 library(gridExtra)
 ```
 
-##Abstract
+## Abstract
 
 
 Bicycle sharing is a very popular industry in the last few years. Bicycle sharing not only brings a lot of convenience to the daily life of urban residents but also the creation of many bicycle-sharing companies has injected a lot of vitality into the market. In order to run the company better and get the maximum profit, many companies want to forecast the rental volume based on some specific data from the past, which will help them to plan more rationally. Thus, here comes the problem: what kind of data do bike-sharing companies need to collect to help them forecast future rentals? To figure out this problem, I built a multilevel model with group level ‘month’and ‘weekday’. The result indicates that in different months and weekdays there are different pattern for people to rent bikes. This report can be divided into 4 main parts: Introduction, Method, Result, and Discussion.
